@@ -1,12 +1,27 @@
 
-import type { Request, Response } from "express";
+import type { Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { z } from "zod";
 
 import User from "../models/User.js";
-import { registerSchema, loginSchema } from "../validators/auth.validator.js";
+import {
+  registerSchema,
+  loginSchema,
+} from "../validators/auth.validator.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { sendApiResponse } from "../utils/apiResponse.js";
+
+function publicUser(user: {
+  _id: unknown;
+  name: string;
+  email: string;
+}) {
+  return {
+    user_id: String(user._id),
+    full_name: user.name,
+    email: user.email,
+  };
+}
 
 function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
@@ -19,9 +34,14 @@ function getJwtSecret(): string {
 }
 
 function setAuthCookie(res: Response, userId: string): void {
-  const token = jwt.sign({ sub: userId }, getJwtSecret(), {
-    expiresIn: "1d",
-  });
+  const token = jwt.sign(
+    { sub: userId },
+    getJwtSecret(),
+    {
+      algorithm: "HS256",
+      expiresIn: "1d",
+    }
+  );
 
   res.cookie("taskflow_token", token, {
     httpOnly: true,
@@ -32,27 +52,22 @@ function setAuthCookie(res: Response, userId: string): void {
   });
 }
 
-function publicUser(user: {
-  _id: unknown;
-  name: string;
-  email: string;
-}) {
-  return {
-    id: String(user._id),
-    name: user.name,
-    email: user.email,
-  };
-}
-
 export const register = asyncHandler(async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
 
   if (!parsed.success) {
-    res.status(400).json({
+    return sendApiResponse(res, 400, {
       message: "Invalid registration details",
-      errors: z.treeifyError(parsed.error),
+      error: true,
+      error_code: "VALIDATION_ERROR",
+      data: null,
+      formatting_args: {
+        issues: parsed.error.issues.map((issue) => ({
+          path: issue.path,
+          message: issue.message,
+        })),
+      },
     });
-    return;
   }
 
   const { name, email, password } = parsed.data;
@@ -60,8 +75,12 @@ export const register = asyncHandler(async (req, res) => {
   const existingUser = await User.findOne({ email });
 
   if (existingUser) {
-    res.status(409).json({ message: "An account with this email already exists" });
-    return;
+    return sendApiResponse(res, 409, {
+      message: "An account with this email already exists",
+      error: true,
+      error_code: "USER_EXISTS",
+      data: null,
+    });
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
@@ -75,22 +94,23 @@ export const register = asyncHandler(async (req, res) => {
 
     setAuthCookie(res, String(user._id));
 
-    res.status(201).json({
+    return sendApiResponse(res, 201, {
       message: "Account created successfully",
-      user: publicUser(user),
+      data: publicUser(user),
     });
   } catch (error: unknown) {
-    // Handles concurrent registration attempts for the same email.
     if (
       typeof error === "object" &&
       error !== null &&
       "code" in error &&
       error.code === 11000
     ) {
-      res.status(409).json({
+      return sendApiResponse(res, 409, {
         message: "An account with this email already exists",
+        error: true,
+        error_code: "USER_EXISTS",
+        data: null,
       });
-      return;
     }
 
     throw error;
@@ -101,8 +121,12 @@ export const login = asyncHandler(async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
 
   if (!parsed.success) {
-    res.status(400).json({ message: "Invalid email or password format" });
-    return;
+    return sendApiResponse(res, 400, {
+      message: "Invalid email or password format",
+      error: true,
+      error_code: "VALIDATION_ERROR",
+      data: null,
+    });
   }
 
   const { email, password } = parsed.data;
@@ -110,22 +134,33 @@ export const login = asyncHandler(async (req, res) => {
   const user = await User.findOne({ email }).select("+passwordHash");
 
   if (!user) {
-    res.status(401).json({ message: "Invalid email or password" });
-    return;
+    return sendApiResponse(res, 401, {
+      message: "Invalid email or password",
+      error: true,
+      error_code: "INVALID_CREDENTIALS",
+      data: null,
+    });
   }
 
-  const passwordMatches = await bcrypt.compare(password, user.passwordHash);
+  const passwordMatches = await bcrypt.compare(
+    password,
+    user.passwordHash
+  );
 
   if (!passwordMatches) {
-    res.status(401).json({ message: "Invalid email or password" });
-    return;
+    return sendApiResponse(res, 401, {
+      message: "Invalid email or password",
+      error: true,
+      error_code: "INVALID_CREDENTIALS",
+      data: null,
+    });
   }
 
   setAuthCookie(res, String(user._id));
 
-  res.status(200).json({
+  return sendApiResponse(res, 200, {
     message: "Login successful",
-    user: publicUser(user),
+    data: publicUser(user),
   });
 });
 
@@ -137,7 +172,10 @@ export const logout = asyncHandler(async (_req, res) => {
     path: "/",
   });
 
-  res.status(200).json({ message: "Logged out successfully" });
+  return sendApiResponse(res, 200, {
+    message: "Logged out successfully",
+    data: null,
+  });
 });
 
 export const getMe = asyncHandler(async (_req, res) => {
@@ -146,11 +184,16 @@ export const getMe = asyncHandler(async (_req, res) => {
   const user = await User.findById(userId).select("_id name email");
 
   if (!user) {
-    res.status(401).json({ message: "User account no longer exists" });
-    return;
+    return sendApiResponse(res, 401, {
+      message: "User account no longer exists",
+      error: true,
+      error_code: "USER_NOT_FOUND",
+      data: null,
+    });
   }
 
-  res.status(200).json({
-    user: publicUser(user),
+  return sendApiResponse(res, 200, {
+    message: "Profile details fetched successfully",
+    data: publicUser(user),
   });
 });
