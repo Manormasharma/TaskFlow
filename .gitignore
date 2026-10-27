@@ -1,0 +1,90 @@
+# ==============================
+# Dependencies
+# ==============================
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# ==============================
+# Next.js
+# ==============================
+client/.next/
+client/out/
+
+# ==============================
+# Build output
+# ==============================
+client/build/
+server/dist/
+dist/
+build/
+
+# ==============================
+# Environment variables / secrets
+# ==============================
+.env
+.env.*
+!.env.example
+
+client/.env*
+!client/.env.example
+
+server/.env*
+!server/.env.example
+
+# ==============================
+# TypeScript
+# ==============================
+*.tsbuildinfo
+
+# ==============================
+# Tests and coverage
+# ==============================
+coverage/
+.nyc_output/
+
+# ==============================
+# Logs
+# ==============================
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# ==============================
+# IDE / editor
+# ==============================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ==============================
+# Operating system
+# ==============================
+.DS_Store
+Thumbs.db
+
+# ==============================
+# Terraform (future AWS deployment)
+# ==============================
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+*.tfvars
+!*.tfvars.example
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Keep .terraform.lock.hcl tracked
+
+# ==============================
+# Temporary files
+# ==============================
+tmp/
+temp/
