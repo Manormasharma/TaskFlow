@@ -1,2 +1,2 @@
 # TaskFlow
-Full-stack project management SaaS
+TaskFlow is a full-stack task management application.
