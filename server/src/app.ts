@@ -8,6 +8,8 @@ import cookieParser from "cookie-parser";
 
 import healthRoutes from "./routes/health.routes.js";
 import authRoutes from "./routes/auth.routes.js";
+import projectRoutes from "./routes/project.routes.js";
+import sprintRoutes from "./routes/sprint.routes.js";
 const app = express();
 
 // Security headers
@@ -36,5 +38,7 @@ app.get("/", (_req, res) => {
 // Health-check endpoint
 app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/projects", projectRoutes);
+app.use("/api/sprints", sprintRoutes);
 
 export default app;
