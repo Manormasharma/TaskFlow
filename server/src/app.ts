@@ -10,6 +10,7 @@ import healthRoutes from "./routes/health.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import projectRoutes from "./routes/project.routes.js";
 import sprintRoutes from "./routes/sprint.routes.js";
+import taskRoutes from "./routes/task.routes.js";
 const app = express();
 
 // Security headers
@@ -40,5 +41,6 @@ app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/sprints", sprintRoutes);
+app.use("/api/tasks", taskRoutes);
 
 export default app;
