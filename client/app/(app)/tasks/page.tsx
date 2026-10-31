@@ -1,83 +1,79 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { LayoutGrid, List, Plus } from "lucide-react";
-import { Card, Button, EmptyState, Input, PageHeader, Select } from "@/components/ui";
+import { Button, EmptyState, ErrorState, ListSkeleton, Modal, PageHeader } from "@/components/ui";
 import TaskForm from "@/components/TaskForm";
+import TaskFilters, { applyFilters, DEFAULT_FILTERS } from "@/components/TaskFilters";
 import TaskList, { TaskBoard } from "@/components/TaskList";
-import TasksState from "@/components/TasksState";
-import { useTasks } from "@/components/useTasks";
-import { PRIORITY_LABEL, STATUS_LABEL } from "@/lib/format";
+import { useToast } from "@/components/ToastProvider";
+import { useTaskActions } from "@/components/useTaskActions";
+import { useWorkspace } from "@/components/useWorkspace";
 import { createTask } from "@/lib/tasks";
-import type { TaskInput } from "@/types";
-
-const SORT_LABEL = { newest: "Newest", due: "Due date", priority: "Priority" };
-const PRIORITY_RANK = { high: 0, medium: 1, low: 2 };
 
 export default function TasksPage() {
-  const { tasks, loading, error, unavailable, reload } = useTasks();
+  const { data, loading, error, reload, mutate } = useWorkspace();
+  const toast = useToast();
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [view, setView] = useState<"list" | "board">("board");
   const [creating, setCreating] = useState(false);
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("all");
-  const [priority, setPriority] = useState("all");
-  const [sort, setSort] = useState("newest");
-  const [view, setView] = useState<"list" | "board">("list");
 
-  const visible = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return tasks
-      .filter((t) => !q || t.title.toLowerCase().includes(q))
-      .filter((t) => status === "all" || t.status === status)
-      .filter((t) => priority === "all" || t.priority === priority)
-      .sort((a, b) => {
-        if (sort === "priority") return PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
-        if (sort === "due") return (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999");
-        return b.createdAt.localeCompare(a.createdAt);
-      });
-  }, [tasks, search, status, priority, sort]);
+  const actions = useTaskActions((updated) =>
+    mutate((w) => ({ ...w, tasks: w.tasks.map((t) => (t._id === updated._id ? updated : t)) })),
+  );
 
-  async function handleCreate(values: TaskInput) {
-    await createTask(values); // throws (and the form shows the error) if the backend rejects it
-    setCreating(false);
-    reload();
-  }
+  const visible = data ? applyFilters(data.tasks, filters) : [];
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Tasks" subtitle="Search, filter and manage everything in one place.">
+      <PageHeader title="Tasks" subtitle="Every task across all of your projects.">
         <div className="flex gap-2">
           <Button variant="secondary" onClick={() => setView(view === "list" ? "board" : "list")}>
             {view === "list" ? <LayoutGrid size={16} className="mr-1" /> : <List size={16} className="mr-1" />}
             {view === "list" ? "Board" : "List"} view
           </Button>
-          <Button onClick={() => setCreating(true)} disabled={creating}>
+          <Button onClick={() => setCreating(true)} disabled={!data?.projects.length}>
             <Plus size={16} className="mr-1" /> New task
           </Button>
         </div>
       </PageHeader>
 
-      {creating && (
-        <Card>
-          <TaskForm submitLabel="Create task" onSubmit={handleCreate} onCancel={() => setCreating(false)} />
-        </Card>
+      {data && (
+        <TaskFilters value={filters} onChange={setFilters} sprints={data.sprints} projects={data.projects} />
       )}
 
-      <Card className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Input id="search" label="Search" value={search} onChange={(e) => setSearch(e.target.value)} />
-        <Select id="f-status" label="Status" value={status} onChange={(e) => setStatus(e.target.value)}
-          options={{ all: "All", ...STATUS_LABEL }} />
-        <Select id="f-priority" label="Priority" value={priority} onChange={(e) => setPriority(e.target.value)}
-          options={{ all: "All", ...PRIORITY_LABEL }} />
-        <Select id="sort" label="Sort by" value={sort} onChange={(e) => setSort(e.target.value)} options={SORT_LABEL} />
-      </Card>
-
-      <TasksState loading={loading} error={error} unavailable={unavailable} onRetry={reload} />
-      {!loading && !error && !unavailable &&
-        (visible.length ? (
-          view === "list" ? <TaskList tasks={visible} /> : <TaskBoard tasks={visible} />
+      {loading && !data && <ListSkeleton />}
+      {error && <ErrorState message={error} onRetry={reload} />}
+      {data &&
+        (!data.projects.length ? (
+          <EmptyState title="No projects yet" text="Tasks belong to a project. Create a project first." />
+        ) : visible.length || view === "board" ? (
+          view === "board" ? (
+            <TaskBoard tasks={visible} sprints={data.sprints} projects={data.projects} {...actions} />
+          ) : (
+            <TaskList tasks={visible} sprints={data.sprints} projects={data.projects} {...actions} />
+          )
         ) : (
-          <EmptyState title="No tasks found" text={tasks.length ? "Try changing your filters." : "Create your first task."} />
+          <EmptyState title="No tasks found" text={data.tasks.length ? "Try changing your filters." : "Create your first task."} />
         ))}
+
+      {creating && data && (
+        <Modal title="New task" onClose={() => setCreating(false)}>
+          <TaskForm
+            projects={data.projects}
+            defaultProjectId={filters.project === "all" ? "" : filters.project}
+            sprints={data.sprints}
+            submitLabel="Create task"
+            onCancel={() => setCreating(false)}
+            onSubmit={async (projectId, values) => {
+              const created = await createTask(projectId, values);
+              mutate((w) => ({ ...w, tasks: [created, ...w.tasks] }));
+              setCreating(false);
+              toast("Task created");
+            }}
+          />
+        </Modal>
+      )}
     </div>
   );
 }

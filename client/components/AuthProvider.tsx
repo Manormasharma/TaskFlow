@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { setUnauthorizedHandler } from "@/lib/api";
 import { getMe, logout as logoutRequest } from "@/lib/auth";
 import type { User } from "@/types";
 
@@ -27,6 +28,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setStatus("authenticated");
       })
       .catch(() => setStatus("unauthenticated"));
+  }, []);
+
+  // An expired session (401 from any API call) signs the user out; AppShell redirects to /login.
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setUserState(null);
+      setStatus("unauthenticated");
+    });
+    return () => setUnauthorizedHandler(null);
   }, []);
 
   const setUser = useCallback((me: User) => {

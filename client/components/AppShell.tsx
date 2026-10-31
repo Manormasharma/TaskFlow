@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { CheckSquare, LayoutDashboard, LogOut, Menu, Settings, X } from "lucide-react";
+import { CheckSquare, FolderKanban, LayoutDashboard, LogOut, Menu, Settings, X } from "lucide-react";
 import { useAuth } from "./AuthProvider";
 import { Avatar, Loading } from "./ui";
 
 const links = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/tasks", label: "Tasks", icon: CheckSquare },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
